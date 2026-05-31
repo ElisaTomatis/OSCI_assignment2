@@ -305,7 +305,7 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
         Differenze osservate nelle n_sim repliche all'ultimo S testato
     """
     
-    n_scenario = 0
+    n_scenario = 1
     rng = np.random.default_rng(seed)
 
     # quantile della normale standard
@@ -313,14 +313,16 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
 
     lb_conf_int = np.inf
     ub_conf_int = -np.inf
-
-    while not (lb_conf_int <= 0 <= ub_conf_int):
+    profitto_stimato = 1
+    
+    while (not (lb_conf_int <= 0 <= ub_conf_int)) or (abs(lb_conf_int - ub_conf_int)/profitto_stimato > 0.01):
         # Se lo zero e' dentro l'intervallo, allora la differenza media tra due soluzioni 
         # ottenute con campioni diversi non e' significativamente diversa da zero
         
+        profitto_medio = []
         phi_list = []
         n_scenario += 1
-
+        print(n_scenario)
         for _ in range(n_sim):
 
             d1 = sample_d(rng, mu, sigma, (J, n_scenario))
@@ -328,9 +330,11 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
 
             _, _, sol1 = solve_model(n_scenario, d1)
             _, _, sol2 = solve_model(n_scenario, d2)
+            profitto_medio.append((sol1 + sol2)/2)
 
             phi_list.append(sol1 - sol2)
 
+        profitto_stimato = np.mean(profitto_medio)
         phi_campionaria = np.mean(phi_list)
         sigma_campionaria = np.std(phi_list, ddof=1)
         # ddof=1 significa che si usa la formula campionaria dividendo per n_sim - 1 
@@ -386,7 +390,7 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
     """
     
     n_scenario = 0
-    big_n_scenario = 100
+    big_n_scenario = 200
     rng = np.random.default_rng(seed)
 
     z_alpha = scipy.stats.norm.ppf(1-alpha/2)
@@ -399,6 +403,7 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
         D = sample_d(rng, mu, sigma, (J, big_n_scenario))
         phi_list = []
         n_scenario += 1
+        print(n_scenario)
 
         for _ in range(n_sim):
 

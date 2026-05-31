@@ -2,7 +2,7 @@ from utils import *
 
 seed = 42
 # Numero di scenari
-num_scenarios = 10
+num_scenarios = 15
 
 
 def print_section(title):
@@ -49,10 +49,11 @@ print_array("Prodotti assemblati nel secondo stadio (y)", y)
 print(f"Profitto atteso campionario: {obj:.2f}")
 
 alpha = 0.05
-n_sim = 10
+n_sim = 500
 media, deviazione, n_scenario_req, lb, ub, phi_list = in_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 print_stability_results("Stabilita' in-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
 
+n_sim = 100
 media, deviazione, n_scenario_req, lb, ub, phi_list = out_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 print_stability_results("Stabilita' out-of-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
 
