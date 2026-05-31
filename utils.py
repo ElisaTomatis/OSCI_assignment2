@@ -2,6 +2,7 @@ import gurobipy as gp
 import numpy as np
 import pandas as pd
 import scipy
+import matplotlib.pyplot as plt
 
 """
 Utility per un modello Assembly To Order (ATO) a due stadi.
@@ -508,3 +509,91 @@ def robustness_analysis(mu_assunta, sigma_assunta, mu_vera, sigma_vera, S, seed)
     perdita_percentuale = perdita / valore_ottimo_vero * 100
 
     return valore_assunto, valore_robusto, valore_ottimo_vero, perdita, perdita_percentuale, x_assunta, x_vera
+
+
+def compute_vss_evpi_grid(mu_base, sigma_base, mu_factors, sigma_factors, S, seed):
+    """
+    Calcola VSS ed EVPI per una griglia di valori di media e deviazione standard.
+
+    Ogni cella della griglia corrisponde a una distribuzione di domanda ottenuta
+    moltiplicando la media base per un fattore di mu e la deviazione standard
+    base per un fattore di sigma.
+
+    Parametri
+    mu_base : numpy.ndarray, shape (J,)
+        Vettore delle medie di riferimento.
+    sigma_base : numpy.ndarray, shape (J,)
+        Vettore delle deviazioni standard di riferimento.
+    mu_factors : list[float] or numpy.ndarray
+        Moltiplicatori applicati a mu_base.
+    sigma_factors : list[float] or numpy.ndarray
+        Moltiplicatori applicati a sigma_base.
+    S : int
+        Numero di scenari generati per ogni combinazione.
+    seed : int
+        Seed del generatore casuale.
+
+    Ritorna
+    vss_grid : numpy.ndarray, shape (len(sigma_factors), len(mu_factors))
+        Valori di VSS per ogni combinazione.
+    evpi_grid : numpy.ndarray, shape (len(sigma_factors), len(mu_factors))
+        Valori di EVPI per ogni combinazione.
+    """
+
+    rng = np.random.default_rng(seed)
+    vss_grid = np.zeros((len(sigma_factors), len(mu_factors)))
+    evpi_grid = np.zeros((len(sigma_factors), len(mu_factors)))
+
+    for i, sigma_factor in enumerate(sigma_factors):
+        for j, mu_factor in enumerate(mu_factors):
+            mu_test = mu_base * mu_factor
+            sigma_test = sigma_base * sigma_factor
+            d = sample_d(rng, mu_test, sigma_test, (J, S))
+
+            VSS, _, _, _ = compute_vss(S, d)
+            EVPI, _, _, _ = compute_evpi(S, d)
+
+            vss_grid[i, j] = VSS
+            evpi_grid[i, j] = EVPI
+
+    return vss_grid, evpi_grid
+
+
+def plot_vss_evpi_heatmaps(mu_factors, sigma_factors, vss_grid, evpi_grid, output_path=None):
+    """
+    Disegna due heatmap affiancate per visualizzare VSS ed EVPI.
+
+    Sull'asse orizzontale vengono riportati i moltiplicatori della media,
+    mentre sull'asse verticale vengono riportati i moltiplicatori della
+    deviazione standard. Se output_path e' valorizzato, il grafico viene
+    salvato su file; altrimenti viene mostrato a schermo.
+    """
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+
+    heatmaps = [
+        (axes[0], vss_grid, "VSS"),
+        (axes[1], evpi_grid, "EVPI"),
+    ]
+
+    for ax, grid, title in heatmaps:
+        image = ax.imshow(grid, origin="lower", aspect="auto", cmap="viridis")
+        ax.set_title(title)
+        ax.set_xlabel("Moltiplicatore media")
+        ax.set_ylabel("Moltiplicatore deviazione standard")
+        ax.set_xticks(np.arange(len(mu_factors)))
+        ax.set_yticks(np.arange(len(sigma_factors)))
+        ax.set_xticklabels([f"{factor:.2f}" for factor in mu_factors])
+        ax.set_yticklabels([f"{factor:.2f}" for factor in sigma_factors])
+
+        for i in range(len(sigma_factors)):
+            for j in range(len(mu_factors)):
+                ax.text(j, i, f"{grid[i, j]:.1f}", ha="center", va="center", color="white")
+
+        fig.colorbar(image, ax=ax)
+
+    if output_path is None:
+        plt.show()
+    else:
+        fig.savefig(output_path, dpi=300)
+        plt.close(fig)

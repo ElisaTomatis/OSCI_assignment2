@@ -109,3 +109,31 @@ for nome_caso, params in stress_cases.items():
     print("Valore ottimo con distribuzione vera:", round(valore_ottimo_vero, 2))
     print("Perdita:", round(perdita, 2))
     print("Perdita %:", round(perdita_percentuale, 2))
+
+
+# HEATMAP VSS ED EVPI AL VARIARE DI MEDIA E DEVIAZIONE STANDARD
+
+mu_factors = np.array([0.70, 0.85, 1.00, 1.15, 1.30])
+sigma_factors = np.array([0.50, 0.80, 1.00, 1.25, 1.50])
+
+vss_grid, evpi_grid = compute_vss_evpi_grid(
+    mu_pizza,
+    sigma_pizza,
+    mu_factors,
+    sigma_factors,
+    num_scenarios,
+    seed,
+)
+
+plot_vss_evpi_heatmaps(
+    mu_factors,
+    sigma_factors,
+    vss_grid,
+    evpi_grid,
+    output_path="vss_evpi_heatmaps.png",
+)
+
+print_section("Heatmap VSS ed EVPI")
+print_array("Griglia VSS", vss_grid)
+print_array("Griglia EVPI", evpi_grid)
+print("Grafico salvato in: vss_evpi_heatmaps.png")
