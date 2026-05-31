@@ -82,8 +82,6 @@ T = np.array([
     [0,            0,          0.5 ]  # 10. Salsiccia
 ])
 
-# Vettore Limiti/Capacità L (M x 1)
-# NOTA: I valori non erano forniti, ho inserito "8" come placeholder (es. 8 ore per ogni fase)
 L = np.array([
     [240], # Impasto
     [300], # Taglio
@@ -92,6 +90,31 @@ L = np.array([
 
 
 def sample_d(rng, mu_pizza, sigma_pizza, size):
+    """
+    Genera scenari di domanda per i prodotti finiti
+
+    La domanda di ciascun prodotto viene simulata con una distribuzione
+    lognormale parametrizzata in modo che media e deviazione standard siano
+    quelle passate in input. I valori simulati vengono arrotondati per
+    rappresentare un numero intero di pizze richieste
+
+    Parametri
+    rng : numpy.random.Generator
+        Generatore casuale usato per rendere replicabile la simulazione
+    mu_pizza : numpy.ndarray, shape (J,)
+        Domanda media attesa per ciascun prodotto
+    sigma_pizza : numpy.ndarray, shape (J,)
+        Deviazione standard della domanda per ciascun prodotto
+    size : tuple[int, int]
+        Coppia (J, S), dove J e' il numero di prodotti e S il numero di
+        scenari da generare
+
+    Ritorna
+    d : numpy.ndarray, shape (J, S)
+        Matrice delle domande simulate. L'elemento d[j, s] e' la domanda del
+        prodotto j nello scenario s.
+    """
+
     sigmas = np.sqrt(np.log(1+sigma_pizza**2/mu_pizza**2))
     mus = np.log(mu_pizza)-sigmas**2/2
     
@@ -240,7 +263,7 @@ def solve_model_x_fixed(S, d, x):
 
 def in_sample_stability(mu, sigma, alpha, n_sim, seed):
     """
-    Studia la stabilita' in-sample al crescere del numero di scenari S.
+    Studia la stabilita' in-sample al crescere del numero di scenari S
 
     Per ogni valore di S vengono generati, per n_sim repliche, due campioni
     indipendenti di domanda della stessa dimensione. Su ciascun campione si
@@ -251,34 +274,34 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
 
     Se S e' sufficientemente grande, due campioni della stessa distribuzione
     dovrebbero produrre valori ottimi simili. La procedura aumenta S finche'
-    l'intervallo di confidenza per E[phi] contiene 0.
+    l'intervallo di confidenza per E[phi] contiene 0
 
     Parametri
     mu : float
-        Parametro di media della normale sottostante alla lognormale.
+        Parametro di media della normale sottostante alla lognormale
     sigma : float
-        Deviazione standard della normale sottostante alla lognormale.
+        Deviazione standard della normale sottostante alla lognormale
     alpha : float
         Livello di significativita' dell'intervallo di confidenza. Per esempio
-        alpha=0.05 produce un intervallo al 95%.
+        alpha=0.05 produce un intervallo al 95%
     n_sim : int
         Numero di repliche Monte Carlo usate per stimare media e deviazione
-        standard di phi per ogni S.
+        standard di phi per ogni S
     seed : int
-        Seed del generatore casuale, utile per rendere replicabili i risultati.
+        Seed del generatore casuale, utile per rendere replicabili i risultati
 
     Ritorna
     phi_campionaria : float
-        Media campionaria delle differenze phi all'ultimo S testato.
+        Media campionaria delle differenze phi all'ultimo S testato
     sigma_campionaria : float
-        Deviazione standard campionaria delle differenze phi.
+        Deviazione standard campionaria delle differenze phi
     n_scenario : int
         Numero di scenari S richiesto per ottenere stabilita' secondo il
-        criterio dell'intervallo di confidenza.
+        criterio dell'intervallo di confidenza
     lb_conf_int, ub_conf_int : float
-        Estremi inferiore e superiore dell'intervallo di confidenza.
+        Estremi inferiore e superiore dell'intervallo di confidenza
     phi_list : list[float]
-        Differenze osservate nelle n_sim repliche all'ultimo S testato.
+        Differenze osservate nelle n_sim repliche all'ultimo S testato
     """
     
     n_scenario = 0
@@ -320,46 +343,45 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
 
 def out_sample_stability(mu, sigma, alpha, n_sim, seed):
     """
-    Studia la stabilita' out-of-sample delle soluzioni ottenute con S scenari.
+    Studia la stabilita' out-of-sample delle soluzioni ottenute con S scenari
 
     Per ogni valore di S la funzione:
-    1. genera un campione grande D, usato come approssimazione della distribuzione vera della domanda;
-    2. per ogni replica genera un campione piccolo d con S scenari;
-    3. risolve il problema su d, ottenendo una soluzione di primo stadio x;
-    4. valuta quella stessa x sul campione grande D con solve_model_x_fixed;
-    5. confronta il valore in-sample con il valore out-of-sample:
-
+    1. genera un campione grande D, usato come approssimazione della distribuzione vera della domanda
+    2. per ogni replica genera un campione piccolo d con S scenari
+    3. risolve il problema su d, ottenendo una soluzione di primo stadio x
+    4. valuta quella stessa x sul campione grande D con solve_model_x_fixed
+    5. confronta il valore in-sample con il valore out-of-sample
         phi = valore_in_sample - valore_out_of_sample
 
     La procedura aumenta S finche' l'intervallo di confidenza per E[phi]
     contiene 0, oppure finche' S arriva a 50. Un intervallo che contiene 0
     indica che, con il criterio adottato, non emerge una differenza sistematica
     tra il valore stimato sul campione di ottimizzazione e quello stimato sul
-    campione di valutazione.
+    campione di valutazione
 
     Parametri
     mu : float
-        Parametro di media della normale sottostante alla lognormale.
+        Parametro di media della normale sottostante alla lognormale
     sigma : float
-        Deviazione standard della normale sottostante alla lognormale.
+        Deviazione standard della normale sottostante alla lognormale
     alpha : float
-        Livello di significativita' dell'intervallo di confidenza.
+        Livello di significativita' dell'intervallo di confidenza
     n_sim : int
-        Numero di repliche Monte Carlo per ogni S.
+        Numero di repliche Monte Carlo per ogni S
     seed : int
-        Seed del generatore casuale.
+        Seed del generatore casuale
 
     Ritorna
     phi_campionaria : float
-        Media campionaria delle differenze phi all'ultimo S testato.
+        Media campionaria delle differenze phi all'ultimo S testato
     sigma_campionaria : float
-        Deviazione standard campionaria delle differenze phi.
+        Deviazione standard campionaria delle differenze phi
     n_scenario : int
-        Numero di scenari S raggiunto dalla procedura.
+        Numero di scenari S raggiunto dalla procedura
     lb_conf_int, ub_conf_int : float
-        Estremi dell'intervallo di confidenza per E[phi].
+        Estremi dell'intervallo di confidenza per E[phi]
     phi_list : list[float]
-        Differenze osservate nelle n_sim repliche all'ultimo S testato.
+        Differenze osservate nelle n_sim repliche all'ultimo S testato
     """
     
     n_scenario = 0
@@ -399,11 +421,11 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
 
 def compute_vss(S, d):
     """
-    Calcola il Value of the Stochastic Solution (VSS).
+    Calcola il Value of the Stochastic Solution (VSS)
 
-    RP e' il valore ottimo del problema stocastico.
+    RP e' il valore ottimo del problema stocastico
     EEV e' il valore atteso ottenuto usando la soluzione deterministica
-    calcolata sulla domanda media.
+    calcolata sulla domanda media
 
     Per un problema di massimizzazione:
         VSS = RP - EEV
@@ -427,13 +449,13 @@ def compute_vss(S, d):
 
 def compute_evpi(S, d):
     """
-    Calcola l'Expected Value of Perfect Information (EVPI).
+    Calcola l'Expected Value of Perfect Information (EVPI)
 
     RP e' il valore ottimo del problema stocastico, dove x deve essere scelto
-    prima di conoscere quale scenario si realizzera'.
+    prima di conoscere quale scenario si realizzera'
 
     WS e' il valore wait-and-see: per ogni scenario si risolve il problema
-    come se la domanda fosse nota in anticipo.
+    come se la domanda fosse nota in anticipo
 
     Per un problema di massimizzazione:
         EVPI = WS - RP
@@ -459,3 +481,30 @@ def compute_evpi(S, d):
     EVPI = WS - RP
 
     return EVPI, WS, RP, ws_values
+
+
+def robustness_analysis(mu_assunta, sigma_assunta, mu_vera, sigma_vera, S, seed):
+    """
+    Valuta la robustezza della soluzione di primo stadio rispetto a errori
+    nel modello di domanda
+
+    La funzione ottimizza x usando la distribuzione assunta, poi valuta quella
+    stessa x su scenari generati dalla distribuzione vera. Il risultato viene
+    confrontato con il valore che si otterrebbe ottimizzando direttamente sulla
+    distribuzione vera
+    """
+
+    rng = np.random.default_rng(seed)
+
+    d_train = sample_d(rng, mu_assunta, sigma_assunta, (J, S))
+    x_assunta, _, valore_assunto = solve_model(S, d_train)
+
+    d_test = sample_d(rng, mu_vera, sigma_vera, (J, S))
+    _, valore_robusto = solve_model_x_fixed(S, d_test, x_assunta)
+
+    x_vera, _, valore_ottimo_vero = solve_model(S, d_test)
+
+    perdita = valore_ottimo_vero - valore_robusto
+    perdita_percentuale = perdita / valore_ottimo_vero * 100
+
+    return valore_assunto, valore_robusto, valore_ottimo_vero, perdita, perdita_percentuale, x_assunta, x_vera
