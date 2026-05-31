@@ -27,44 +27,83 @@ distribuzione lognormale.
 # G[i, j]: unita' del componente i necessarie per assemblare una unita'
 #          del prodotto finito j.
 
-'''I = 3
-J = 2
-M = 5
-
-
-C = np.random.random((I,1))
-P = np.random.random((J,1))
-L = 20*np.random.random((M,1))
-T = np.random.random((I,M))
-G = 20*np.random.random((I,J))'''
-
-I = 3
-J = 2
-M = 1
+I = 10  
+J = 6   
+M = 3   # m1: Impasto, m2: Taglio, m3: Cottura
 
 C = np.array([
-    [1], [1], [3]
+    [0.50],  # 1. Impasto
+    [0.40],  # 2. Salsa di pomodoro
+    [0.80],  # 3. Mozzarella
+    [1.00],  # 4. Salame piccante
+    [0.90],  # 5. Prosciutto cotto
+    [0.70],  # 6. Funghi
+    [0.80],  # 7. Carciofini
+    [1.50],  # 8. Mix 4 Formaggi
+    [0.90],  # 9. Verdure grigliate
+    [1.10]   # 10. Salsiccia
 ])
-
 P = np.array([
-    [6],[8.5]
+    [6.50],  # 1. Margherita
+    [8.00],  # 2. Diavola
+    [9.50],  # 3. Capricciosa
+    [9.00],  # 4. Quattro Formaggi
+    [8.50],  # 5. Ortolana
+    [9.00]   # 6. Boscaiola
 ])
 
-L = np.array([
-    [6]
-])
-
-T = np.array([
-    [0.5],
-    [0.25],
-    [0.25]
-])
 
 G = np.array([
-    [1,1],
-    [1,1], 
-    [0,1]
+    # Mar, Dia, Cap, 4Fo, Ort, Bos
+    [1,   1,   1,   1,   1,   1], # 1. Impasto
+    [1,   1,   1,   0,   1,   0], # 2. Salsa pomodoro
+    [1,   1,   1,   0,   1,   1], # 3. Mozzarella
+    [0,   1,   0,   0,   0,   0], # 4. Salame piccante
+    [0,   0,   1,   0,   0,   0], # 5. Prosciutto cotto
+    [0,   0,   1,   0,   0,   1], # 6. Funghi
+    [0,   0,   1,   0,   0,   0], # 7. Carciofini
+    [0,   0,   0,   1,   0,   0], # 8. Mix 4 Formaggi
+    [0,   0,   0,   0,   1,   0], # 9. Verdure grigliate
+    [0,   0,   0,   0,   0,   1]  # 10. Salsiccia
 ])
+
+
+T = np.array([
+    # m1(Impasto), m2(Taglio), m3(Cottura)
+    [0.5,          0,          0   ], # 1. Impasto
+    [0,            0,          0.2 ], # 2. Salsa pomodoro
+    [0,            0.3,        0   ], # 3. Mozzarella
+    [0,            0.15,       0   ], # 4. Salame piccante
+    [0,            0.15,       0   ], # 5. Prosciutto cotto
+    [0,            0,          0.4 ], # 6. Funghi
+    [0,            0,          0.2 ], # 7. Carciofini
+    [0,            0.5,        0   ], # 8. Mix 4 Formaggi
+    [0,            0,          0.6 ], # 9. Verdure grigliate
+    [0,            0,          0.5 ]  # 10. Salsiccia
+])
+
+# Vettore Limiti/Capacità L (M x 1)
+# NOTA: I valori non erano forniti, ho inserito "8" come placeholder (es. 8 ore per ogni fase)
+L = np.array([
+    [240], # Impasto
+    [300], # Taglio
+    [360]  # Cottura
+])
+
+
+def sample_d(rng, mu_pizza, sigma_pizza, size):
+    sigmas = np.sqrt(np.log(1+sigma_pizza**2/mu_pizza**2))
+    mus = np.log(mu_pizza)-sigmas**2/2
+    
+    J,S = size
+    d = np.zeros((J,S))
+
+    for j in range(J):
+        d[j, :] = rng.lognormal(mus[j], sigmas[j], S)
+
+    d = np.round(d)
+    
+    return d
 
 
 
@@ -258,10 +297,10 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
         phi_list = []
         n_scenario += 1
 
-        for sim in range(n_sim):
+        for _ in range(n_sim):
 
-            d1 = rng.lognormal(mean=mu, sigma=sigma, size=(J, n_scenario))
-            d2 = rng.lognormal(mean=mu, sigma=sigma, size=(J, n_scenario))
+            d1 = sample_d(rng, mu, sigma, (J, n_scenario))
+            d2 = sample_d(rng, mu, sigma, (J, n_scenario))
 
             _, _, sol1 = solve_model(n_scenario, d1)
             _, _, sol2 = solve_model(n_scenario, d2)
@@ -334,13 +373,13 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
 
     while (not (lb_conf_int <= 0 <= ub_conf_int) and (n_scenario < 50)):
         
-        D = rng.lognormal(mean=mu, sigma=sigma, size=(J, big_n_scenario))
+        D = sample_d(rng, mu, sigma, (J, big_n_scenario))
         phi_list = []
         n_scenario += 1
 
-        for sim in range(n_sim):
+        for _ in range(n_sim):
 
-            d = rng.lognormal(mean=mu, sigma=sigma, size=(J, n_scenario))
+            d = sample_d(rng, mu, sigma, (J, n_scenario))
             x, _, sol = solve_model(n_scenario, d)
             # valore in-sample, stimato sugli stessi scenari usati per ottimizzare
 
