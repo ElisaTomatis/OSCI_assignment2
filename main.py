@@ -49,15 +49,19 @@ print_array("Prodotti assemblati nel secondo stadio (y)", y)
 print(f"Profitto atteso campionario: {obj:.2f}")
 
 alpha = 0.05
-n_sim = 500
-media, deviazione, n_scenario_req, lb, ub, phi_list = in_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
+n_sim = 200
+"""media, deviazione, n_scenario_req, lb, ub, phi_list = in_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 print_stability_results("Stabilita' in-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
+in_sample_stability_plot(mu_pizza, sigma_pizza, alpha, n_sim, seed)"""
+
 
 n_sim = 100
-media, deviazione, n_scenario_req, lb, ub, phi_list = out_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
-print_stability_results("Stabilita' out-of-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
+#media, deviazione, n_scenario_req, lb, ub, phi_list = out_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
+#print_stability_results("Stabilita' out-of-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
 
+out_of_sample_stability_plot(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 
+"""
 # punto 2
 rng = np.random.default_rng(seed)
 
@@ -138,3 +142,4 @@ print_section("Heatmap VSS ed EVPI")
 print_array("Griglia VSS", vss_grid)
 print_array("Griglia EVPI", evpi_grid)
 print("Grafico salvato in: vss_evpi_heatmaps.png")
+"""

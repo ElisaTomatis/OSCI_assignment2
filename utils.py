@@ -130,7 +130,6 @@ def sample_d(rng, mu_pizza, sigma_pizza, size):
     return d
 
 
-
 def solve_model(S, d):
     """
     Risolve il problema stocastico ATO a due stadi per un campione di scenari.
@@ -208,7 +207,6 @@ def solve_model(S, d):
     return x_np, y_np, obj_np
 
 
-
 def solve_model_x_fixed(S, d, x):
     """
     Valuta una soluzione di primo stadio fissata su un insieme di scenari.
@@ -259,7 +257,6 @@ def solve_model_x_fixed(S, d, x):
             obj_np = model.ObjVal
 
     return y_np, obj_np
-
 
 
 def in_sample_stability(mu, sigma, alpha, n_sim, seed):
@@ -345,6 +342,64 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
     return phi_campionaria, sigma_campionaria, n_scenario, lb_conf_int, ub_conf_int, phi_list
 
 
+def in_sample_stability_plot(mu, sigma, alpha, n_sim, seed):
+    # Liste per il grafico
+    s_values = []
+    phi_means = []
+    conf_intervals = [] # Per le barre di errore
+
+    n_scenario = 1
+    rng = np.random.default_rng(seed)
+
+    # quantile della normale standard
+    z_alpha = scipy.stats.norm.ppf(1-alpha/2)
+
+    lb_conf_int = np.inf
+    ub_conf_int = -np.inf
+    profitto_stimato = 1
+
+    
+    while (not (lb_conf_int <= 0 <= ub_conf_int)) or (abs(lb_conf_int - ub_conf_int)/profitto_stimato > 0.005):
+        
+        profitto_medio = []
+        phi_list = []
+        n_scenario += 1
+        print(n_scenario)
+        for _ in range(n_sim):
+
+            d1 = sample_d(rng, mu, sigma, (J, n_scenario))
+            d2 = sample_d(rng, mu, sigma, (J, n_scenario))
+
+            _, _, sol1 = solve_model(n_scenario, d1)
+            _, _, sol2 = solve_model(n_scenario, d2)
+            profitto_medio.append((sol1 + sol2)/2)
+
+            phi_list.append(sol1 - sol2)
+        
+        profitto_stimato = np.mean(profitto_medio)
+        phi_campionaria = np.mean(phi_list)
+        sigma_campionaria = np.std(phi_list, ddof=1)
+
+        # Al termine del calcolo per ogni n_scenario, salva i dati:
+        s_values.append(n_scenario)
+        phi_means.append(phi_campionaria)
+        # Salviamo il margine di errore (metà ampiezza IC)
+        conf_intervals.append(z_alpha * sigma_campionaria / np.sqrt(n_sim))
+
+        lb_conf_int = phi_campionaria - z_alpha * sigma_campionaria / np.sqrt(n_sim)
+        ub_conf_int = phi_campionaria + z_alpha * sigma_campionaria / np.sqrt(n_sim)
+
+    plt.figure(figsize=(10, 6))
+    plt.errorbar(s_values, phi_means, yerr=conf_intervals, fmt='-o', capsize=5, ecolor='red', label='Media $\phi$ con IC 95%')
+    plt.axhline(y=0, color='black', linestyle='--') # Linea di riferimento per lo zero
+    plt.xlabel('Numero di Scenari (S)')
+    plt.ylabel('Differenza Valore Ottimo ($\phi$)')
+    plt.title('Analisi Stabilità In-Sample: Convergenza della differenza media')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.savefig('stabilita_in_sample.png', dpi=300, bbox_inches='tight')
+    plt.show()
+
 
 def out_sample_stability(mu, sigma, alpha, n_sim, seed):
     """
@@ -398,11 +453,10 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
     lb_conf_int = np.inf
     ub_conf_int = -np.inf
 
-    while (not (lb_conf_int <= 0 <= ub_conf_int) and (n_scenario < 50)):
+    while (not (lb_conf_int <= 0 <= ub_conf_int) and (n_scenario < 100)):
         
-        D = sample_d(rng, mu, sigma, (J, big_n_scenario))
         phi_list = []
-        n_scenario += 1
+        n_scenario += 10
         print(n_scenario)
 
         for _ in range(n_sim):
@@ -412,6 +466,7 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
             # valore in-sample, stimato sugli stessi scenari usati per ottimizzare
 
             # Se produco i componenti x trovati prima, quanto guadagno quando la domanda segue il campione grande D?
+            D = sample_d(rng, mu, sigma, (J, big_n_scenario))
             _, SOL = solve_model_x_fixed(big_n_scenario, D, x)
 
             phi_list.append(sol - SOL)
@@ -421,8 +476,91 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
 
         lb_conf_int = phi_campionaria - z_alpha * sigma_campionaria / np.sqrt(n_sim)
         ub_conf_int = phi_campionaria + z_alpha * sigma_campionaria / np.sqrt(n_sim)
+        print(f"intervallo di confidenza [{lb_conf_int},{ub_conf_int}]")
 
     return phi_campionaria, sigma_campionaria, n_scenario, lb_conf_int, ub_conf_int, phi_list
+
+
+def out_of_sample_stability_plot(mu, sigma, alpha, n_sim, seed):
+    """
+    Esegue l'analisi out-of-sample e genera il grafico a forchetta.
+    """
+    n_scenario = 0
+    max_s = 100
+    big_n_scenario = 200  # Campione grande per approssimare la distribuzione vera
+    rng = np.random.default_rng(seed)
+    z_alpha = scipy.stats.norm.ppf(1-alpha/2)
+
+    # Liste per memorizzare i dati del plot
+    s_values = []
+    in_sample_means = []
+    out_sample_means = []
+    
+    # Generiamo un campione GRANDE una sola volta per coerenza nel test out-of-sample
+    # D_big = sample_d(rng, mu, sigma, (J, big_n_scenario))
+
+    lb_conf_int = np.inf
+    ub_conf_int = -np.inf
+
+    print("Inizio analisi Out-of-Sample...")
+
+    # Continua finché non c'è stabilità o raggiungiamo il limite max_s
+    while (not (lb_conf_int <= 0 <= ub_conf_int) and (n_scenario < max_s)):
+
+        n_scenario += 5 # Incremento di 2 per rendere il plot più leggibile e veloce
+        s_values.append(n_scenario)
+        
+        tmp_in_sample = []
+        tmp_out_sample = []
+        phi_list = []
+
+        for _ in range(n_sim):
+            # 1. Campione piccolo per ottimizzazione
+            d_small = sample_d(rng, mu, sigma, (J, n_scenario))
+            
+            # 2. Ottimizzazione (In-Sample)
+            x_hat, _, sol_in = solve_model(n_scenario, d_small)
+            tmp_in_sample.append(sol_in)
+
+            # 3. Valutazione della x_hat sul campione grande (Out-of-Sample)
+            D_big = sample_d(rng, mu, sigma, (J, big_n_scenario))
+            _, sol_out = solve_model_x_fixed(big_n_scenario, D_big, x_hat)
+            tmp_out_sample.append(sol_out)
+            
+            # Differenza per il criterio di stop
+            phi_list.append(sol_in - sol_out)
+
+        # Medie per il plot
+        avg_in = np.mean(tmp_in_sample)
+        avg_out = np.mean(tmp_out_sample)
+        in_sample_means.append(avg_in)
+        out_sample_means.append(avg_out)
+
+        # Calcolo intervallo di confidenza per il criterio di stop
+        phi_campionaria = np.mean(phi_list)
+        sigma_phi = np.std(phi_list, ddof=1)
+        lb_conf_int = phi_campionaria - z_alpha * sigma_phi / np.sqrt(n_sim)
+        ub_conf_int = phi_campionaria + z_alpha * sigma_phi / np.sqrt(n_sim)
+        print(f"intervallo di confidenza [{lb_conf_int},{ub_conf_int}]")
+        
+        print(f"S={n_scenario} | In-Sample: {avg_in:.2f} | Out-of-Sample: {avg_out:.2f} | Gap: {phi_campionaria:.2f}")
+
+    # --- GENERAZIONE E SALVATAGGIO DEL PLOT ---
+    plt.figure(figsize=(10, 6))
+    plt.plot(s_values, in_sample_means, 'o-', label='Valore In-Sample ($z_S^*$)', color='blue')
+    plt.plot(s_values, out_sample_means, 's-', label='Valore Out-of-Sample (Evaluated $\hat{x}$)', color='green')
+    
+    plt.title('Stabilità Out-of-Sample: Grafico a Forchetta', fontsize=14)
+    plt.xlabel('Numero di Scenari di Ottimizzazione ($S$)', fontsize=12)
+    plt.ylabel('Valore della Funzione Obiettivo (Profitto Atteso)', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend()
+    
+    # Salvataggio come richiesto per il report
+    plt.savefig('stabilita_out_sample_forchetta.pdf', bbox_inches='tight')
+    plt.savefig('stabilita_out_sample_forchetta.png', dpi=300, bbox_inches='tight')
+    
+    plt.show()
 
 
 def compute_vss(S, d):
@@ -452,6 +590,7 @@ def compute_vss(S, d):
     VSS = RP - EEV
 
     return VSS, RP, EEV, x_EV
+
 
 def compute_evpi(S, d):
     """
