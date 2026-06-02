@@ -234,27 +234,31 @@ def solve_model_x_fixed(S, d, x):
     pi = np.ones((S,1))/S
 
     # Bounds
-    y_lb = np.zeros((J,S))
+    y_lb = np.zeros((J,))
     y_ub = d
 
+    obj_np = 0.0
     # Variabili decisionali
     with gp.Env(empty=True) as env:
         env.setParam("OutputFlag", 0)
         env.start()
 
-        with gp.Model(env=env) as model:
+        for s in range(S):
+            with gp.Model(env=env) as model:
 
-            y = model.addMVar((J,S), name="y", lb=y_lb, ub=y_ub)
+                y = model.addMVar((J,), name="y", lb=y_lb, ub=y_ub[:,s])
 
-            model.setObjective(-C.flatten() @ x + P.flatten() @ (y @ pi.flatten()), gp.GRB.MAXIMIZE)
+                # model.setObjective(-C.flatten() @ x + P.flatten() @ (y @ pi.flatten()), gp.GRB.MAXIMIZE)
+                model.setObjective( P.flatten() @ y, gp.GRB.MAXIMIZE)
+                # Vincolo di disponibilita' dei componenti per l'assemblaggio.
+                constr_assembl = model.addConstr(G @ y <= x.flatten(), name="constr_assembl")
 
-            # Vincolo di disponibilita' dei componenti per l'assemblaggio.
-            constr_assembl = model.addConstr(G @ y <= gp.hstack([x] * S), name="constr_assembl")
+                model.optimize()
 
-            model.optimize()
+                y_np = y.X
+                obj_np = obj_np + model.ObjVal
 
-            y_np = y.X
-            obj_np = model.ObjVal
+        obj_np = obj_np / S  -C.flatten() @ x
 
     return y_np, obj_np
 
@@ -468,6 +472,7 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
             # Se produco i componenti x trovati prima, quanto guadagno quando la domanda segue il campione grande D?
             D = sample_d(rng, mu, sigma, (J, big_n_scenario))
             _, SOL = solve_model_x_fixed(big_n_scenario, D, x)
+            
 
             phi_list.append(sol - SOL)
 
@@ -487,7 +492,7 @@ def out_of_sample_stability_plot(mu, sigma, alpha, n_sim, seed):
     """
     n_scenario = 0
     max_s = 100
-    big_n_scenario = 200  # Campione grande per approssimare la distribuzione vera
+    big_n_scenario = 1000  # Campione grande per approssimare la distribuzione vera
     rng = np.random.default_rng(seed)
     z_alpha = scipy.stats.norm.ppf(1-alpha/2)
 
@@ -507,7 +512,7 @@ def out_of_sample_stability_plot(mu, sigma, alpha, n_sim, seed):
     # Continua finché non c'è stabilità o raggiungiamo il limite max_s
     while (not (lb_conf_int <= 0 <= ub_conf_int) and (n_scenario < max_s)):
 
-        n_scenario += 5 # Incremento di 2 per rendere il plot più leggibile e veloce
+        n_scenario += 10 # Incremento di 2 per rendere il plot più leggibile e veloce
         s_values.append(n_scenario)
         
         tmp_in_sample = []
