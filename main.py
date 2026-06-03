@@ -52,7 +52,7 @@ alpha = 0.05
 n_sim = 200
 """media, deviazione, n_scenario_req, lb, ub, phi_list = in_sample_stability(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 print_stability_results("Stabilita' in-sample", media, deviazione, n_scenario_req, lb, ub, phi_list)
-in_sample_stability_plot(mu_pizza, sigma_pizza, alpha, n_sim, seed)"""
+in_sample_stability_plot(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 
 
 n_sim = 100
@@ -61,7 +61,7 @@ n_sim = 100
 
 out_of_sample_stability_plot(mu_pizza, sigma_pizza, alpha, n_sim, seed)
 
-"""
+
 # punto 2
 rng = np.random.default_rng(seed)
 
@@ -143,3 +143,22 @@ print_array("Griglia VSS", vss_grid)
 print_array("Griglia EVPI", evpi_grid)
 print("Grafico salvato in: vss_evpi_heatmaps.png")
 """
+
+
+# STUDIO SULLA ROBUSTEZZA
+nomi_comp = ["Impasto", "Salsa di pomodoro", "Mozzarella", "Salame piccante", "Prosciutto cotto", 
+             "Funghi", "Carciofini", "Mix 4 Formaggi", "Verdure grigliate", "Salsiccia"]
+
+
+# 2. Eseguiamo l'analisi (usando la funzione 'robustness_gamma_analysis' del messaggio precedente)
+risultati = robustness_distribution(mu_pizza, sigma_pizza, S_train=50, S_test=190, seed=42, distribution="gamma")
+
+# 3. Generiamo il grafico
+robustness_distribution_plot(risultati, component_names=nomi_comp, distribution="gamma")
+print(f'{risultati["perdita"]}, {risultati["perdita_perc"]}, {risultati["x_diff"]}')
+
+risultati = robustness_distribution(mu_pizza, sigma_pizza, S_train=50, S_test=190, seed=42, distribution="uniforme")
+
+# 3. Generiamo il grafico
+robustness_distribution_plot(risultati, component_names=nomi_comp, distribution="uniforme")
+print(f'{risultati["perdita"]}, {risultati["perdita_perc"]}, {risultati["x_diff"]}')

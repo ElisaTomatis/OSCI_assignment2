@@ -4,16 +4,6 @@ import pandas as pd
 import scipy
 import matplotlib.pyplot as plt
 
-"""
-Utility per un modello Assembly To Order (ATO) a due stadi.
-
-Il primo stadio sceglie le quantita' di componenti da produrre prima di
-conoscere la domanda. Il secondo stadio, per ciascuno scenario di domanda,
-sceglie quante unita' di prodotto finito assemblare usando i componenti
-disponibili. La domanda dei prodotti finiti viene simulata con una
-distribuzione lognormale.
-"""
-
 # Dati del problema.
 #
 # I: numero di componenti.
@@ -128,6 +118,85 @@ def sample_d(rng, mu_pizza, sigma_pizza, size):
     d = np.round(d)
     
     return d
+
+
+def sample_d_gamma(rng, mu_pizza, sigma_pizza, size):
+    """
+    Genera scenari di domanda per i prodotti finiti
+
+    La domanda di ciascun prodotto viene simulata con una distribuzione
+    gamma parametrizzata in modo che media e deviazione standard siano
+    quelle passate in input. I valori simulati vengono arrotondati per
+    rappresentare un numero intero di pizze richieste
+
+    Parametri
+    rng : numpy.random.Generator
+        Generatore casuale usato per rendere replicabile la simulazione
+    mu_pizza : numpy.ndarray, shape (J,)
+        Domanda media attesa per ciascun prodotto
+    sigma_pizza : numpy.ndarray, shape (J,)
+        Deviazione standard della domanda per ciascun prodotto
+    size : tuple[int, int]
+        Coppia (J, S), dove J e' il numero di prodotti e S il numero di
+        scenari da generare
+
+    Ritorna
+    d : numpy.ndarray, shape (J, S)
+        Matrice delle domande simulate. L'elemento d[j, s] e' la domanda del
+        prodotto j nello scenario s.
+    """
+
+    ks = mu_pizza**2 / sigma_pizza**2
+    thetas = sigma_pizza**2 / mu_pizza
+    
+    J,S = size
+    d = np.zeros((J,S))
+
+    for j in range(J):
+        d[j, :] = rng.gamma(ks[j], thetas[j], S)
+
+    d = np.round(d)
+    
+    return d
+
+def sample_d_uniform(rng, mu_pizza, sigma_pizza, size):
+    """
+    Genera scenari di domanda per i prodotti finiti
+
+    La domanda di ciascun prodotto viene simulata con una distribuzione
+    uniforme su un intervallo molto ampio. I valori simulati vengono arrotondati per
+    rappresentare un numero intero di pizze richieste
+
+    Parametri
+    rng : numpy.random.Generator
+        Generatore casuale usato per rendere replicabile la simulazione
+    mu_pizza : numpy.ndarray, shape (J,)
+        Domanda media attesa per ciascun prodotto
+    sigma_pizza : numpy.ndarray, shape (J,)
+        Deviazione standard della domanda per ciascun prodotto
+    size : tuple[int, int]
+        Coppia (J, S), dove J e' il numero di prodotti e S il numero di
+        scenari da generare
+
+    Ritorna
+    d : numpy.ndarray, shape (J, S)
+        Matrice delle domande simulate. L'elemento d[j, s] e' la domanda del
+        prodotto j nello scenario s.
+    """
+
+    a = mu_pizza - np.sqrt(3)*sigma_pizza
+    b = mu_pizza + np.sqrt(3)*sigma_pizza
+    
+    J,S = size
+    d = np.zeros((J,S))
+
+    for j in range(J):
+        d[j, :] = rng.gamma(a[j], b[j], S)
+
+    d = np.round(d)
+    
+    return d
+
 
 
 def solve_model(S, d):
@@ -658,6 +727,90 @@ def robustness_analysis(mu_assunta, sigma_assunta, mu_vera, sigma_vera, S, seed)
     perdita_percentuale = perdita / valore_ottimo_vero * 100
 
     return valore_assunto, valore_robusto, valore_ottimo_vero, perdita, perdita_percentuale, x_assunta, x_vera
+
+
+def robustness_distribution(mu, sigma, S_train, S_test, seed, distribution):
+    """
+    S_train: scenari usati per decidere x (es. 50)
+    S_test: scenari usati per valutare la bonta' della scelta (es. 1000)
+
+    Valuta la robustezza della soluzione di primo stadio rispetto a dati simulati da una gamma
+
+    La funzione ottimizza x usando la distribuzione assunta, poi valuta quella
+    stessa x su scenari generati dalla distribuzione vera. Il risultato viene
+    confrontato con il valore che si otterrebbe ottimizzando direttamente sulla
+    distribuzione vera
+    """
+    rng = np.random.default_rng(seed)
+
+    d_train_log = sample_d(rng, mu, sigma, (J, S_train))
+    x_assunta, _, _ = solve_model(S_train, d_train_log)
+
+    if distribution == "gamma":
+        d_test_distribution = sample_d_gamma(rng, mu, sigma, (J, S_test))
+    elif distribution == "uniforme":
+        d_test_distribution = sample_d_uniform(rng, mu, sigma, (J, S_test))
+
+    _, valore_x_assunta_su_distribuzione = solve_model_x_fixed(S_test, d_test_distribution, x_assunta)
+
+    x_vera_gamma, _, ottimo_teorico_distribuzione = solve_model(S_test, d_test_distribution)
+
+    perdita = ottimo_teorico_distribuzione - valore_x_assunta_su_distribuzione[0]
+    perdita_percentuale = (perdita / ottimo_teorico_distribuzione) * 100
+    print(ottimo_teorico_distribuzione)
+    print(valore_x_assunta_su_distribuzione)
+    print(perdita_percentuale)
+    return {
+        "distribuzione": distribution,
+        "perdita": perdita,
+        "perdita_perc": perdita_percentuale,
+        "x_diff": np.linalg.norm(x_assunta - x_vera_gamma)/np.linalg.norm(x_vera_gamma), # Differenza decisionale
+        "x_assunta": x_assunta,
+        "x_vera": x_vera_gamma
+    }
+    
+
+def robustness_distribution_plot(results, component_names=None, distribution = None):
+    """
+    Crea un grafico a barre che confronta le quantita' prodotte (x) 
+    sotto il modello assunto (lognormale) e il modello vero.
+    """
+    x_assunta = results['x_assunta'].flatten()
+    x_vera = results['x_vera'].flatten()
+    
+    n_components = len(x_assunta)
+    if component_names is None:
+        component_names = [f"Comp {i+1}" for i in range(n_components)]
+    
+    x = np.arange(n_components)  # Posizioni delle etichette
+    width = 0.35  # Larghezza delle barre
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    # Creazione delle barre
+    rects1 = ax.bar(x - width/2, x_assunta, width, label='Strategia Assunta (lognormale)', color='#3498db')
+    rects2 = ax.bar(x + width/2, x_vera, width, label=f'Strategia Ottima Reale ({distribution})', color='#e74c3c')
+
+    # Aggiunta di etichette, titolo e legenda
+    ax.set_ylabel('Quantità prodotta (x)')
+    ax.set_title('Confronto Decisioni di Primo Stadio: Modello Assunto vs Reale')
+    ax.set_xticks(x)
+    ax.set_xticklabels(component_names, rotation=45, ha='right')
+    ax.legend()
+
+    # Aggiungiamo la differenza percentuale sopra le barre per facilitare l'analisi
+    for i in range(n_components):
+        diff_perc = ((x_vera[i] - x_assunta[i]) / x_assunta[i] * 100) if x_assunta[i] > 0 else 0
+        color = 'green' if diff_perc > 0 else 'red'
+        ax.annotate(f'{diff_perc:+.1f}%',
+                    xy=(x[i], max(x_assunta[i], x_vera[i])),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom', fontsize=9, fontweight='bold', color=color)
+
+    fig.tight_layout()
+    plt.savefig(f'robustezza_{distribution}.png', bbox_inches='tight')
+    plt.show()
 
 
 def compute_vss_evpi_grid(mu_base, sigma_base, mu_factors, sigma_factors, S, seed):
