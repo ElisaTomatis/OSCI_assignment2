@@ -80,22 +80,21 @@ L = np.array([
 ])
 
 
-def sample_d(rng, mu_pizza, sigma_pizza, size):
+def sample_d(rng, a_pizza, b_pizza, size):
     """
     Genera scenari di domanda per i prodotti finiti
 
     La domanda di ciascun prodotto viene simulata con una distribuzione
-    lognormale parametrizzata in modo che media e deviazione standard siano
-    quelle passate in input. I valori simulati vengono arrotondati per
-    rappresentare un numero intero di pizze richieste
+    lognormale basata sui parametri assunti a_i e b_i. I valori simulati
+    vengono arrotondati per rappresentare un numero intero di pizze richieste.
 
     Parametri
     rng : numpy.random.Generator
         Generatore casuale usato per rendere replicabile la simulazione
-    mu_pizza : numpy.ndarray, shape (J,)
-        Domanda media attesa per ciascun prodotto
-    sigma_pizza : numpy.ndarray, shape (J,)
-        Deviazione standard della domanda per ciascun prodotto
+    a_pizza : numpy.ndarray, shape (J,)
+        Parametri a_i assunti per ciascun prodotto
+    b_pizza : numpy.ndarray, shape (J,)
+        Parametri b_i assunti per ciascun prodotto
     size : tuple[int, int]
         Coppia (J, S), dove J e' il numero di prodotti e S il numero di
         scenari da generare
@@ -106,8 +105,8 @@ def sample_d(rng, mu_pizza, sigma_pizza, size):
         prodotto j nello scenario s.
     """
 
-    sigmas = np.sqrt(np.log(1+sigma_pizza**2/mu_pizza**2))
-    mus = np.log(mu_pizza)-sigmas**2/2
+    sigmas = np.sqrt(np.log(1+b_pizza**2/a_pizza**2))
+    mus = np.log(a_pizza)-sigmas**2/2
     
     J,S = size
     d = np.zeros((J,S))
@@ -327,7 +326,7 @@ def solve_model_x_fixed(S, d, x):
                 y_np = y.X
                 obj_np = obj_np + model.ObjVal
 
-        obj_np = obj_np / S  -C.flatten() @ x
+        obj_np = obj_np / S - float(C.flatten() @ x.flatten())
 
     return y_np, obj_np
 
@@ -392,7 +391,6 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
         profitto_medio = []
         phi_list = []
         n_scenario += 1
-        print(n_scenario)
         for _ in range(n_sim):
 
             d1 = sample_d(rng, mu, sigma, (J, n_scenario))
@@ -437,7 +435,6 @@ def in_sample_stability_plot(mu, sigma, alpha, n_sim, seed):
         profitto_medio = []
         phi_list = []
         n_scenario += 1
-        print(n_scenario)
         for _ in range(n_sim):
 
             d1 = sample_d(rng, mu, sigma, (J, n_scenario))
@@ -530,7 +527,6 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
         
         phi_list = []
         n_scenario += 10
-        print(n_scenario)
 
         for _ in range(n_sim):
 
@@ -702,7 +698,35 @@ def compute_evpi(S, d):
     return EVPI, WS, RP, ws_values
 
 
-def robustness_analysis(mu_assunta, sigma_assunta, mu_vera, sigma_vera, S, seed):
+def plot_value_histogram(labels, values, title, output_path):
+    """
+    Disegna un istogramma/bar chart per confrontare valori economici scalari.
+    """
+
+    values = np.asarray(values, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(7, 5), constrained_layout=True)
+    bars = ax.bar(labels, values, color=["#4C78A8", "#59A14F", "#F28E2B"])
+
+    ax.set_title(title)
+    ax.set_ylabel("Valore")
+    ax.grid(axis="y", linestyle="--", alpha=0.35)
+
+    for bar, value in zip(bars, values):
+        ax.annotate(
+            f"{value:.2f}",
+            xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
+            xytext=(0, 4),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+        )
+
+    fig.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+
+def robustness_analysis(a_assunto, b_assunto, a_vero, b_vero, S, seed):
     """
     Valuta la robustezza della soluzione di primo stadio rispetto a errori
     nel modello di domanda
@@ -715,10 +739,10 @@ def robustness_analysis(mu_assunta, sigma_assunta, mu_vera, sigma_vera, S, seed)
 
     rng = np.random.default_rng(seed)
 
-    d_train = sample_d(rng, mu_assunta, sigma_assunta, (J, S))
+    d_train = sample_d(rng, a_assunto, b_assunto, (J, S))
     x_assunta, _, valore_assunto = solve_model(S, d_train)
 
-    d_test = sample_d(rng, mu_vera, sigma_vera, (J, S))
+    d_test = sample_d(rng, a_vero, b_vero, (J, S))
     _, valore_robusto = solve_model_x_fixed(S, d_test, x_assunta)
 
     x_vera, _, valore_ottimo_vero = solve_model(S, d_test)
@@ -813,44 +837,43 @@ def robustness_distribution_plot(results, component_names=None, distribution = N
     plt.show()
 
 
-def compute_vss_evpi_grid(mu_base, sigma_base, mu_factors, sigma_factors, S, seed):
+def compute_vss_evpi_grid(a_base, b_base, a_factors, b_factors, S, seed):
     """
-    Calcola VSS ed EVPI per una griglia di valori di media e deviazione standard.
+    Calcola VSS ed EVPI per una griglia di valori dei parametri a_i e b_i.
 
-    Ogni cella della griglia corrisponde a una distribuzione di domanda ottenuta
-    moltiplicando la media base per un fattore di mu e la deviazione standard
-    base per un fattore di sigma.
+    Ogni cella della griglia corrisponde a una distribuzione di domanda
+    ottenuta moltiplicando i parametri base per due fattori di stress.
 
     Parametri
-    mu_base : numpy.ndarray, shape (J,)
-        Vettore delle medie di riferimento.
-    sigma_base : numpy.ndarray, shape (J,)
-        Vettore delle deviazioni standard di riferimento.
-    mu_factors : list[float] or numpy.ndarray
-        Moltiplicatori applicati a mu_base.
-    sigma_factors : list[float] or numpy.ndarray
-        Moltiplicatori applicati a sigma_base.
+    a_base : numpy.ndarray, shape (J,)
+        Vettore dei parametri a_i di riferimento.
+    b_base : numpy.ndarray, shape (J,)
+        Vettore dei parametri b_i di riferimento.
+    a_factors : list[float] or numpy.ndarray
+        Moltiplicatori applicati ad a_base.
+    b_factors : list[float] or numpy.ndarray
+        Moltiplicatori applicati a b_base.
     S : int
         Numero di scenari generati per ogni combinazione.
     seed : int
         Seed del generatore casuale.
 
     Ritorna
-    vss_grid : numpy.ndarray, shape (len(sigma_factors), len(mu_factors))
+    vss_grid : numpy.ndarray, shape (len(b_factors), len(a_factors))
         Valori di VSS per ogni combinazione.
-    evpi_grid : numpy.ndarray, shape (len(sigma_factors), len(mu_factors))
+    evpi_grid : numpy.ndarray, shape (len(b_factors), len(a_factors))
         Valori di EVPI per ogni combinazione.
     """
 
     rng = np.random.default_rng(seed)
-    vss_grid = np.zeros((len(sigma_factors), len(mu_factors)))
-    evpi_grid = np.zeros((len(sigma_factors), len(mu_factors)))
+    vss_grid = np.zeros((len(b_factors), len(a_factors)))
+    evpi_grid = np.zeros((len(b_factors), len(a_factors)))
 
-    for i, sigma_factor in enumerate(sigma_factors):
-        for j, mu_factor in enumerate(mu_factors):
-            mu_test = mu_base * mu_factor
-            sigma_test = sigma_base * sigma_factor
-            d = sample_d(rng, mu_test, sigma_test, (J, S))
+    for i, b_factor in enumerate(b_factors):
+        for j, a_factor in enumerate(a_factors):
+            a_test = a_base * a_factor
+            b_test = b_base * b_factor
+            d = sample_d(rng, a_test, b_test, (J, S))
 
             VSS, _, _, _ = compute_vss(S, d)
             EVPI, _, _, _ = compute_evpi(S, d)
@@ -861,14 +884,14 @@ def compute_vss_evpi_grid(mu_base, sigma_base, mu_factors, sigma_factors, S, see
     return vss_grid, evpi_grid
 
 
-def plot_vss_evpi_heatmaps(mu_factors, sigma_factors, vss_grid, evpi_grid, output_path=None):
+def plot_vss_evpi_heatmaps(a_factors, b_factors, vss_grid, evpi_grid, output_path=None):
     """
     Disegna due heatmap affiancate per visualizzare VSS ed EVPI.
 
-    Sull'asse orizzontale vengono riportati i moltiplicatori della media,
-    mentre sull'asse verticale vengono riportati i moltiplicatori della
-    deviazione standard. Se output_path e' valorizzato, il grafico viene
-    salvato su file; altrimenti viene mostrato a schermo.
+    Sull'asse orizzontale vengono riportati i moltiplicatori di a_i, mentre
+    sull'asse verticale vengono riportati i moltiplicatori di b_i. Se
+    output_path e' valorizzato, il grafico viene salvato su file; altrimenti
+    viene mostrato a schermo.
     """
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
@@ -881,15 +904,15 @@ def plot_vss_evpi_heatmaps(mu_factors, sigma_factors, vss_grid, evpi_grid, outpu
     for ax, grid, title in heatmaps:
         image = ax.imshow(grid, origin="lower", aspect="auto", cmap="viridis")
         ax.set_title(title)
-        ax.set_xlabel("Moltiplicatore media")
-        ax.set_ylabel("Moltiplicatore deviazione standard")
-        ax.set_xticks(np.arange(len(mu_factors)))
-        ax.set_yticks(np.arange(len(sigma_factors)))
-        ax.set_xticklabels([f"{factor:.2f}" for factor in mu_factors])
-        ax.set_yticklabels([f"{factor:.2f}" for factor in sigma_factors])
+        ax.set_xlabel("Moltiplicatore a_i")
+        ax.set_ylabel("Moltiplicatore b_i")
+        ax.set_xticks(np.arange(len(a_factors)))
+        ax.set_yticks(np.arange(len(b_factors)))
+        ax.set_xticklabels([f"{factor:.2f}" for factor in a_factors])
+        ax.set_yticklabels([f"{factor:.2f}" for factor in b_factors])
 
-        for i in range(len(sigma_factors)):
-            for j in range(len(mu_factors)):
+        for i in range(len(b_factors)):
+            for j in range(len(a_factors)):
                 ax.text(j, i, f"{grid[i, j]:.1f}", ha="center", va="center", color="white")
 
         fig.colorbar(image, ax=ax)
