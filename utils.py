@@ -80,7 +80,7 @@ L = np.array([
 ])
 
 
-def sample_d(rng, a_pizza, b_pizza, size):
+def sample_d(rng, mu_pizza, sigma_pizza, size):
     """
     Genera scenari di domanda per i prodotti finiti
 
@@ -91,10 +91,10 @@ def sample_d(rng, a_pizza, b_pizza, size):
     Parametri
     rng : numpy.random.Generator
         Generatore casuale usato per rendere replicabile la simulazione
-    a_pizza : numpy.ndarray, shape (J,)
-        Parametri a_i assunti per ciascun prodotto
-    b_pizza : numpy.ndarray, shape (J,)
-        Parametri b_i assunti per ciascun prodotto
+    mu_pizza : numpy.ndarray, shape (J,)
+        Parametri mu_i assunti per ciascun prodotto
+    sigma_pizza : numpy.ndarray, shape (J,)
+        Parametri sigma_i assunti per ciascun prodotto
     size : tuple[int, int]
         Coppia (J, S), dove J e' il numero di prodotti e S il numero di
         scenari da generare
@@ -105,8 +105,8 @@ def sample_d(rng, a_pizza, b_pizza, size):
         prodotto j nello scenario s.
     """
 
-    sigmas = np.sqrt(np.log(1+b_pizza**2/a_pizza**2))
-    mus = np.log(a_pizza)-sigmas**2/2
+    sigmas = np.sqrt(np.log(1+sigma_pizza**2/mu_pizza**2))
+    mus = np.log(mu_pizza)-sigmas**2/2
     
     J,S = size
     d = np.zeros((J,S))
@@ -204,14 +204,10 @@ def solve_model(S, d):
 
     Parametri
     S : int
-        Numero di scenari di domanda considerati nella Sample Average
-        Approximation (SAA).
+        Numero di scenari di domanda considerati nella Sample Average Approximation (SAA).
     d : numpy.ndarray, shape (J, S)
-        Matrice delle domande simulate. L'elemento d[j, s] e' la domanda del
-        prodotto j nello scenario s. Viene usata anche come upper bound per
-        la variabile y[j, s], perche' non ha senso assemblare piu' della
-        domanda osservata.
-
+        Matrice delle domande simulate. L'elemento d[j, s] e' la domanda del prodotto j nello scenario s. 
+        Viene usata anche come upper bound per la variabile y[j, s], perche' non ha senso assemblare piu' della domanda osservata.
 
     Modello
 
@@ -285,18 +281,13 @@ def solve_model_x_fixed(S, d, x):
     testandola su un campione piu' grande o diverso.
 
     Parametri
-    S : int
-        Numero di scenari su cui valutare la soluzione fissata.
-    d : numpy.ndarray, shape (J, S)
-        Matrice delle domande degli scenari di valutazione.
-    x : numpy.ndarray, shape (I, 1)
-        Quantita' di componenti gia' prodotte nel primo stadio.
+    S : int -> Numero di scenari su cui valutare la soluzione fissata.
+    d : numpy.ndarray, shape (J, S) -> Matrice delle domande degli scenari di valutazione.
+    x : numpy.ndarray, shape (I, 1) -> Quantita' di componenti gia' prodotte nel primo stadio.
 
     Ritorna
-    y_np : numpy.ndarray, shape (J, S)
-        Quantita' ottime da assemblare in ciascuno scenario, dato x.
-    obj_np : float
-        Profitto atteso campionario ottenuto mantenendo x fissato.
+    y_np : numpy.ndarray, shape (J, S) -> Quantita' ottime da assemblare in ciascuno scenario, dato x.
+    obj_np : float -> Profitto atteso campionario ottenuto mantenendo x fissato.
     """
 
     pi = np.ones((S,1))/S
@@ -335,11 +326,8 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
     """
     Studia la stabilita' in-sample al crescere del numero di scenari S
 
-    Per ogni valore di S vengono generati, per n_sim repliche, due campioni
-    indipendenti di domanda della stessa dimensione. Su ciascun campione si
-    risolve il problema stocastico e si calcola la differenza tra i due valori
-    ottimi:
-
+    Per ogni valore di S vengono generati, per n_sim repliche, due campioni indipendenti di domanda della stessa dimensione. 
+    Su ciascun campione si risolve il problema stocastico e si calcola la differenza tra i due valori ottimi:
         phi = z_S^1 - z_S^2
 
     Se S e' sufficientemente grande, due campioni della stessa distribuzione
@@ -347,31 +335,18 @@ def in_sample_stability(mu, sigma, alpha, n_sim, seed):
     l'intervallo di confidenza per E[phi] contiene 0
 
     Parametri
-    mu : float
-        Parametro di media della normale sottostante alla lognormale
-    sigma : float
-        Deviazione standard della normale sottostante alla lognormale
-    alpha : float
-        Livello di significativita' dell'intervallo di confidenza. Per esempio
-        alpha=0.05 produce un intervallo al 95%
-    n_sim : int
-        Numero di repliche Monte Carlo usate per stimare media e deviazione
-        standard di phi per ogni S
-    seed : int
-        Seed del generatore casuale, utile per rendere replicabili i risultati
+    mu : float -> Parametro di media della normale sottostante alla lognormale
+    sigma : float -> Deviazione standard della normale sottostante alla lognormale
+    alpha : float -> Livello di significativita' dell'intervallo di confidenza
+    n_sim : int -> Numero di repliche Monte Carlo usate per stimare media e deviazione standard di phi per ogni S
+    seed : int -> Seed del generatore casuale, utile per rendere replicabili i risultati
 
     Ritorna
-    phi_campionaria : float
-        Media campionaria delle differenze phi all'ultimo S testato
-    sigma_campionaria : float
-        Deviazione standard campionaria delle differenze phi
-    n_scenario : int
-        Numero di scenari S richiesto per ottenere stabilita' secondo il
-        criterio dell'intervallo di confidenza
-    lb_conf_int, ub_conf_int : float
-        Estremi inferiore e superiore dell'intervallo di confidenza
-    phi_list : list[float]
-        Differenze osservate nelle n_sim repliche all'ultimo S testato
+    phi_campionaria : float -> Media campionaria delle differenze phi all'ultimo S testato
+    sigma_campionaria : float -> Deviazione standard campionaria delle differenze phi
+    n_scenario : int -> Numero di scenari S richiesto per ottenere stabilita' secondo il criterio dell'intervallo di confidenza
+    lb_conf_int, ub_conf_int : float -> Estremi inferiore e superiore dell'intervallo di confidenza
+    phi_list : list[float] -> Differenze osservate nelle n_sim repliche all'ultimo S testato
     """
     
     n_scenario = 1
@@ -490,30 +465,19 @@ def out_sample_stability(mu, sigma, alpha, n_sim, seed):
     campione di valutazione
 
     Parametri
-    mu : float
-        Parametro di media della normale sottostante alla lognormale
-    sigma : float
-        Deviazione standard della normale sottostante alla lognormale
-    alpha : float
-        Livello di significativita' dell'intervallo di confidenza
-    n_sim : int
-        Numero di repliche Monte Carlo per ogni S
-    seed : int
-        Seed del generatore casuale
+    mu : float -> Parametro di media della normale sottostante alla lognormale
+    sigma : float -> Deviazione standard della normale sottostante alla lognormale
+    alpha : float -> Livello di significativita' dell'intervallo di confidenza
+    n_sim : int -> Numero di repliche Monte Carlo per ogni S
+    seed : int -> Seed del generatore casuale
 
     Ritorna
-    phi_campionaria : float
-        Media campionaria delle differenze phi all'ultimo S testato
-    sigma_campionaria : float
-        Deviazione standard campionaria delle differenze phi
-    n_scenario : int
-        Numero di scenari S raggiunto dalla procedura
-    lb_conf_int, ub_conf_int : float
-        Estremi dell'intervallo di confidenza per E[phi]
-    phi_list : list[float]
-        Differenze osservate nelle n_sim repliche all'ultimo S testato
+    phi_campionaria : float -> Media campionaria delle differenze phi all'ultimo S testato
+    sigma_campionaria : float -> Deviazione standard campionaria delle differenze phi
+    n_scenario : int -> Numero di scenari S raggiunto dalla procedura
+    lb_conf_int, ub_conf_int : float -> Estremi dell'intervallo di confidenza per E[phi]
+    phi_list : list[float] -> Differenze osservate nelle n_sim repliche all'ultimo S testato
     """
-    
     n_scenario = 0
     big_n_scenario = 200
     rng = np.random.default_rng(seed)
@@ -726,7 +690,7 @@ def plot_value_histogram(labels, values, title, output_path):
     plt.close(fig)
 
 
-def robustness_analysis(a_assunto, b_assunto, a_vero, b_vero, S, seed):
+def robustness_analysis(mu_assunto, sigma_assunto, mu_vero, sigma_vero, S, seed):
     """
     Valuta la robustezza della soluzione di primo stadio rispetto a errori
     nel modello di domanda
@@ -739,10 +703,10 @@ def robustness_analysis(a_assunto, b_assunto, a_vero, b_vero, S, seed):
 
     rng = np.random.default_rng(seed)
 
-    d_train = sample_d(rng, a_assunto, b_assunto, (J, S))
+    d_train = sample_d(rng, mu_assunto, sigma_assunto, (J, S))
     x_assunta, _, valore_assunto = solve_model(S, d_train)
 
-    d_test = sample_d(rng, a_vero, b_vero, (J, S))
+    d_test = sample_d(rng, mu_vero, sigma_vero, (J, S))
     _, valore_robusto = solve_model_x_fixed(S, d_test, x_assunta)
 
     x_vera, _, valore_ottimo_vero = solve_model(S, d_test)
@@ -751,6 +715,72 @@ def robustness_analysis(a_assunto, b_assunto, a_vero, b_vero, S, seed):
     perdita_percentuale = perdita / valore_ottimo_vero * 100
 
     return valore_assunto, valore_robusto, valore_ottimo_vero, perdita, perdita_percentuale, x_assunta, x_vera
+
+
+def compute_robustness_grid(mu_base, sigma_base, mu_factors, sigma_factors, S, seed):
+    """
+    Calcola la perdita percentuale di robustezza per una griglia di variazioni
+    dei parametri reali della domanda (mu_vero e sigma_vero).
+
+    Sull'asse delle ordinate (righe) variano i fattori di sigma, 
+    sull'asse delle ascisse (colonne) variano i fattori di mu.
+    """
+    robustness_grid = np.zeros((len(sigma_factors), len(mu_factors)))
+
+    for i, sigma_factor in enumerate(sigma_factors):
+        for j, mu_factor in enumerate(mu_factors):
+            # Applichiamo i fattori ai parametri assunti/base
+            mu_vero = mu_base * mu_factor
+            sigma_vero = sigma_base * sigma_factor
+
+            # Eseguiamo l'analisi di robustezza esistente
+            # Recuperiamo solo la 'perdita_percentuale' (quinto output)
+            _, _, _, _, perdita_percentuale, _, _ = robustness_analysis(
+                mu_base, sigma_base, mu_vero, sigma_vero, S, seed
+            )
+
+            # Salviamo il risultato nella griglia
+            robustness_grid[i, j] = perdita_percentuale
+
+    return robustness_grid
+
+
+def plot_robustness_heatmap(mu_factors, sigma_factors, grid, output_path=None):
+    """
+    Disegna una heatmap per visualizzare la perdita percentuale di profitto
+    al variare degli errori sui parametri della domanda (Mu e Sigma).
+    """
+    fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
+
+    # Utilizziamo la mappa 'Reds': più è rosso, maggiore è la perdita economica
+    image = ax.imshow(grid, origin="lower", aspect="auto", cmap="Reds")
+    
+    ax.set_title("Analisi di Robustezza: Perdita di Profitto %", fontsize=14, pad=15)
+    ax.set_xlabel("Media della Domanda", fontsize=11)
+    ax.set_ylabel("Deviazione Standard", fontsize=11)
+    
+    ax.set_xticks(np.arange(len(mu_factors)))
+    ax.set_yticks(np.arange(len(sigma_factors)))
+    ax.set_xticklabels([f"{factor:.2f}" for factor in mu_factors])
+    ax.set_yticklabels([f"{factor:.2f}" for factor in sigma_factors])
+
+    # Inseriamo i valori numerici all'interno delle celle
+    # Se la cella è troppo scura, il testo diventa bianco per leggibilità
+    threshold = grid.max() * 0.65
+    for i in range(len(sigma_factors)):
+        for j in range(len(mu_factors)):
+            valore = grid[i, j]
+            color = "white" if valore > threshold else "black"
+            ax.text(j, i, f"{valore:.1f}%", ha="center", va="center", color=color, fontweight="bold")
+
+    cbar = fig.colorbar(image, ax=ax)
+    cbar.set_label("Perdita rispetto all'Ottimo Vero (%)", fontsize=11)
+
+    if output_path is None:
+        plt.show()
+    else:
+        fig.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
 
 def robustness_distribution(mu, sigma, S_train, S_test, seed, distribution):
@@ -837,88 +867,32 @@ def robustness_distribution_plot(results, component_names=None, distribution = N
     plt.show()
 
 
-def compute_vss_evpi_grid(a_base, b_base, a_factors, b_factors, S, seed):
-    """
-    Calcola VSS ed EVPI per una griglia di valori dei parametri a_i e b_i.
+######################## FUNZIONI STAMPA FORMATTATA ########################################
+def print_section(title):
+    """Stampa un'intestazione leggibile per separare i risultati."""
 
-    Ogni cella della griglia corrisponde a una distribuzione di domanda
-    ottenuta moltiplicando i parametri base per due fattori di stress.
-
-    Parametri
-    a_base : numpy.ndarray, shape (J,)
-        Vettore dei parametri a_i di riferimento.
-    b_base : numpy.ndarray, shape (J,)
-        Vettore dei parametri b_i di riferimento.
-    a_factors : list[float] or numpy.ndarray
-        Moltiplicatori applicati ad a_base.
-    b_factors : list[float] or numpy.ndarray
-        Moltiplicatori applicati a b_base.
-    S : int
-        Numero di scenari generati per ogni combinazione.
-    seed : int
-        Seed del generatore casuale.
-
-    Ritorna
-    vss_grid : numpy.ndarray, shape (len(b_factors), len(a_factors))
-        Valori di VSS per ogni combinazione.
-    evpi_grid : numpy.ndarray, shape (len(b_factors), len(a_factors))
-        Valori di EVPI per ogni combinazione.
-    """
-
-    rng = np.random.default_rng(seed)
-    vss_grid = np.zeros((len(b_factors), len(a_factors)))
-    evpi_grid = np.zeros((len(b_factors), len(a_factors)))
-
-    for i, b_factor in enumerate(b_factors):
-        for j, a_factor in enumerate(a_factors):
-            a_test = a_base * a_factor
-            b_test = b_base * b_factor
-            d = sample_d(rng, a_test, b_test, (J, S))
-
-            VSS, _, _, _ = compute_vss(S, d)
-            EVPI, _, _, _ = compute_evpi(S, d)
-
-            vss_grid[i, j] = VSS
-            evpi_grid[i, j] = EVPI
-
-    return vss_grid, evpi_grid
+    print(f"\n{'=' * 70}")
+    print(title)
+    print("=" * 70)
 
 
-def plot_vss_evpi_heatmaps(a_factors, b_factors, vss_grid, evpi_grid, output_path=None):
-    """
-    Disegna due heatmap affiancate per visualizzare VSS ed EVPI.
+def print_array(label, values, decimals=2):
+    """Stampa vettori e matrici numpy con etichetta e arrotondamento."""
 
-    Sull'asse orizzontale vengono riportati i moltiplicatori di a_i, mentre
-    sull'asse verticale vengono riportati i moltiplicatori di b_i. Se
-    output_path e' valorizzato, il grafico viene salvato su file; altrimenti
-    viene mostrato a schermo.
-    """
+    formatted_values = np.array2string(
+        np.asarray(values),
+        precision=decimals,
+        suppress_small=True,
+    )
+    print(f"{label}:\n{formatted_values}\n")
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
-    heatmaps = [
-        (axes[0], vss_grid, "VSS"),
-        (axes[1], evpi_grid, "EVPI"),
-    ]
+def print_stability_results(label, media, deviazione, n_scenario_req, lb, ub, phi_list):
+    """Stampa in modo compatto i risultati delle analisi di stabilita'."""
 
-    for ax, grid, title in heatmaps:
-        image = ax.imshow(grid, origin="lower", aspect="auto", cmap="viridis")
-        ax.set_title(title)
-        ax.set_xlabel("Moltiplicatore a_i")
-        ax.set_ylabel("Moltiplicatore b_i")
-        ax.set_xticks(np.arange(len(a_factors)))
-        ax.set_yticks(np.arange(len(b_factors)))
-        ax.set_xticklabels([f"{factor:.2f}" for factor in a_factors])
-        ax.set_yticklabels([f"{factor:.2f}" for factor in b_factors])
-
-        for i in range(len(b_factors)):
-            for j in range(len(a_factors)):
-                ax.text(j, i, f"{grid[i, j]:.1f}", ha="center", va="center", color="white")
-
-        fig.colorbar(image, ax=ax)
-
-    if output_path is None:
-        plt.show()
-    else:
-        fig.savefig(output_path, dpi=300)
-        plt.close(fig)
+    print_section(label)
+    print(f"Numero di scenari richiesto: {n_scenario_req}")
+    print(f"Media campionaria phi: {media:.2f}")
+    print(f"Deviazione standard phi: {deviazione:.2f}")
+    print(f"Intervallo di confidenza: [{lb:.2f}, {ub:.2f}]")
+    print_array("Valori phi delle repliche", phi_list)
